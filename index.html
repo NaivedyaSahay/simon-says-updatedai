@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Simon</title>
+    <link
+      href="https://fonts.googleapis.com/css?family=Press+Start+2P"
+      rel="stylesheet"
+    />
+    <style>
+      /* General Body and Font Styles */
+      body {
+        background-color: #011f3f;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        margin: 0;
+        text-align: center;
+        font-family: sans-serif;
+      }
+
+      #level-title {
+        font-family: "Press Start 2P", cursive;
+        font-size: clamp(1.5rem, 5vw, 2.5rem); /* Responsive font size */
+        margin-bottom: 25px;
+        color: #fef2bf;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        height: 80px; /* Give title a fixed height to prevent layout shift */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      /* Score Card Styles */
+      .score-container {
+        display: flex;
+        justify-content: space-around;
+        width: clamp(300px, 60vmin, 500px);
+        font-family: "Press Start 2P", cursive;
+        font-size: clamp(0.9rem, 3vw, 1.2rem);
+        color: #fef2bf;
+        margin-bottom: 20px;
+      }
+
+      /* --- NEW: Start Button Styles --- */
+      .start-button {
+        font-family: "Press Start 2P", cursive;
+        font-size: 1.2rem;
+        color: #011f3f;
+        background-color: #fef2bf;
+        padding: 15px 30px;
+        border: 4px solid black;
+        border-radius: 10px;
+        cursor: pointer;
+        margin-bottom: 20px;
+        box-shadow: 0 5px 10px rgba(0,0,0,0.3);
+        transition: all 0.2s ease;
+      }
+
+      .start-button:hover {
+        background-color: #fff;
+        transform: translateY(-2px);
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      /* Simon Game Container */
+      .simon-container {
+        display: grid;
+        grid-template-areas:
+          "green red"
+          "yellow blue";
+        gap: 20px;
+        
+        width: clamp(300px, 60vmin, 500px);
+        height: clamp(300px, 60vmin, 500px);
+        
+        background-color: #011f3f;
+        border-radius: 50%;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4), inset 0 0 15px rgba(0, 0, 0, 0.5);
+        padding: 20px;
+        position: relative;
+      }
+
+      /* Game Buttons */
+      .btn {
+        border: 8px solid black;
+        cursor: pointer;
+        opacity: 0.7;
+        transition: opacity 0.2s ease-in-out, transform 0.1s ease;
+      }
+
+      .btn:hover {
+        opacity: 1;
+      }
+
+      #green {
+        grid-area: green;
+        background-color: #00a74a;
+        border-radius: 100% 0 0 0;
+      }
+
+      #red {
+        grid-area: red;
+        background-color: #9f0f17;
+        border-radius: 0 100% 0 0;
+      }
+
+      #yellow {
+        grid-area: yellow;
+        background-color: #cca707;
+        border-radius: 0 0 0 100%;
+      }
+
+      #blue {
+        grid-area: blue;
+        background-color: #075e8a;
+        border-radius: 0 0 100% 0;
+      }
+
+      .pressed {
+        opacity: 1;
+        transform: scale(0.97);
+        box-shadow: 0 0 20px 5px white;
+      }
+
+      .game-over {
+        background-color: #d90429;
+        opacity: 0.8;
+      }
+    </style>
+  </head>
+
+  <body>
+    <h1 id="level-title">Simon Game</h1>
+
+    <div class="score-container">
+      <div id="score-box">Score: <span id="current-score">0</span></div>
+      <div id="highscore-box">High Score: <span id="high-score">0</span></div>
+    </div>
+    
+    <!-- --- NEW: Start Button --- -->
+    <button id="start-btn" class="start-button">Start Game</button>
+
+    <div class="simon-container">
+      <div class="btn green" id="green"></div>
+      <div class="btn red" id="red"></div>
+      <div class="btn yellow" id="yellow"></div>
+      <div class="btn blue" id="blue"></div>
+    </div>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    
+    <script>
+      var buttonColours = ["red", "blue", "green", "yellow"];
+      var gamePattern = [];
+      var userClickedPattern = [];
+
+      var started = false;
+      var level = 0;
+      var highScore = 0;
+
+      $(document).ready(function() {
+        highScore = localStorage.getItem("simonHighScore") || 0;
+        $("#high-score").text(highScore);
+      });
+
+      // --- MODIFIED: Start the game with a button click ---
+      $("#start-btn").click(function() {
+        if (!started) {
+          $("#start-btn").addClass("hidden"); // Hide the start button
+          $("#current-score").text(0);
+          level = 0;
+          gamePattern = [];
+          started = true;
+          nextSequence();
+        }
+      });
+
+      $(".btn").click(function() {
+        if (!started) return;
+
+        var userChosenColour = $(this).attr("id");
+        userClickedPattern.push(userChosenColour);
+
+        playSound(userChosenColour);
+        animatePress(userChosenColour);
+
+        checkAnswer(userClickedPattern.length - 1);
+      });
+
+      function checkAnswer(currentLevelIndex) {
+        if (gamePattern[currentLevelIndex] === userClickedPattern[currentLevelIndex]) {
+          if (userClickedPattern.length === gamePattern.length) {
+            setTimeout(function() {
+              nextSequence();
+            }, 1000);
+          }
+        } else {
+          playSound("wrong");
+          $("body").addClass("game-over");
+          $("#level-title").text("Game Over!");
+
+          setTimeout(function() {
+            $("body").removeClass("game-over");
+          }, 200);
+
+          startOver();
+        }
+      }
+
+      function nextSequence() {
+        userClickedPattern = [];
+        level++;
+        $("#level-title").text("Level " + level);
+        $("#current-score").text(level - 1);
+
+        var randomNumber = Math.floor(Math.random() * 4);
+        var randomChosenColour = buttonColours[randomNumber];
+        gamePattern.push(randomChosenColour);
+
+        animatePress(randomChosenColour);
+        playSound(randomChosenColour);
+      }
+
+      function animatePress(currentColor) {
+        $("#" + currentColor).addClass("pressed");
+        setTimeout(function() {
+          $("#" + currentColor).removeClass("pressed");
+        }, 150);
+      }
+
+      function playSound(name) {
+        // Sounds will not play in this preview environment
+      }
+
+      function startOver() {
+        var finalScore = level - 1;
+        if (finalScore > highScore) {
+          highScore = finalScore;
+          localStorage.setItem("simonHighScore", highScore);
+          $("#high-score").text(highScore);
+        }
+        
+        started = false;
+        $("#start-btn").removeClass("hidden"); // Show the start button again
+        $("#start-btn").text("Play Again"); // Change button text
+      }
+    </script>
+  </body>
+</html>
